@@ -1,0 +1,15 @@
+name = Domain Fields
+description = Alters fields on a domain based level.
+core = 7.x
+package = Domain Access
+
+dependencies[] = domain (>=3.x)
+dependencies[] = field
+
+
+; Information added by Drupal.org packaging script on 2015-11-04
+version = "7.x-1.0-beta1+4-dev"
+core = "7.x"
+project = "domain_fields"
+datestamp = "1446623649"
+

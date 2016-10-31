@@ -1,0 +1,39 @@
+<?php
+
+/**
+ * @file
+ * Standard installation functions.
+ */
+
+/**
+ * Implements hook_uninstall().
+ */
+function domain_fields_uninstall() {
+  db_delete('variable')
+    ->condition('name', db_like('domain_fields_') . '%', 'LIKE')
+    ->execute();
+}
+/**
+ * Rebuild the menus.
+ */
+function domain_fields_update_7002() {
+  variable_set('menu_rebuild_needed', TRUE);
+  return t('Menu links are queued to be rebuilt.');
+}
+
+/**
+ * Update names of domain_fields_* variables.
+ */
+function domain_fields_update_7003() {
+  $domains = domain_domains();
+  foreach ($domains as $domain) {
+    $old_settings = variable_get('domain_fields_' . $domain['domain_id'], array());
+    $new_settings = variable_get('domain_fields_' . $domain['machine_name'], array());
+
+    if ($old_settings && empty($new_settings)) {
+      variable_set('domain_fields_' . $domain['machine_name'], $old_settings);
+    }
+
+    variable_del('domain_fields_' . $domain['domain_id']);
+  }
+}
