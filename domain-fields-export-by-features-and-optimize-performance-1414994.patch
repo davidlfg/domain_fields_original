@@ -1,0 +1,291 @@
+diff --git a/domain_fields.admin.inc b/domain_fields.admin.inc
+index f481f8a..3f01a9c 100644
+--- a/domain_fields.admin.inc
++++ b/domain_fields.admin.inc
+@@ -95,9 +95,9 @@ function domain_fields_settings_form_reset_submit($form, &$form_state) {
+   $machine_name = $form_state['domain']['machine_name'];
+   $entity_type = $form_state['entity_type'];
+ 
+-  $settings = variable_get('domain_fields_' . $machine_name, array());
++  $settings = variable_domain_fields_get('domain_fields_' . $machine_name, array());
+   $settings[$entity_type] = array();
+-  variable_set('domain_fields_' . $machine_name, $settings);
++  variable_domain_fields_set('domain_fields_' . $machine_name, $settings);
+ }
+ 
+ /**
+@@ -107,9 +107,9 @@ function domain_fields_settings_form_save_submit($form, &$form_state) {
+   $machine_name = $form_state['domain']['machine_name'];
+   $entity_type = $form_state['entity_type'];
+ 
+-  $settings = variable_get('domain_fields_' . $machine_name, array());
++  $settings = variable_domain_fields_get('domain_fields_' . $machine_name, array());
+   $settings[$entity_type] = $form_state['values'][$entity_type];
+-  variable_set('domain_fields_' . $machine_name, $settings);
++  variable_domain_fields_set('domain_fields_' . $machine_name, $settings);
+ }
+ 
+ /**
+diff --git a/domain_fields.features.inc b/domain_fields.features.inc
+new file mode 100644
+index 0000000..0236654
+--- /dev/null
++++ b/domain_fields.features.inc
+@@ -0,0 +1,120 @@
++<?php
++
++/**
++ * @file
++ * Features support for Domain Conf.
++ */
++
++/**
++ * Implements hook_features_export_options().
++ */
++function domain_fields_features_export_options() {
++  //List for components
++  foreach (domain_domains() as $domain) {
++    $options[$domain['machine_name']] = $domain['subdomain'];
++  }
++  return $options;
++}
++
++/**
++ * Implements hook_features_export().
++ */
++function domain_fields_features_export($data, &$export, $module_name) {
++  $export['dependencies']['domain_fields'] = 'domain_fields';
++  $export['dependencies']['domain'] = 'domain';
++  $export['dependencies']['features'] = 'features';
++  $list = domain_features_selection($data);
++  foreach ($list as $machine_name) {
++    $all_fields = domain_fields_settings(array('machine_name' => $machine_name));
++    if ($all_fields == array())
++      continue;
++    $export['features']['domain_fields'][$machine_name] = $machine_name;
++  }
++  return array();
++}
++
++/**
++ * Implements hook_features_export_render().
++ */
++function domain_fields_features_export_render($module_name, $data, $export = NULL) {
++  domain_fields_features_load($module_name, 'domain_fields_variables', FALSE);
++  $code = array();
++  $code[] = '  $domain_fields_variables = array();';
++  //Create code
++  foreach ($data as $key => $machine_name) {
++    $all_fields = domain_fields_settings(array('machine_name' => $machine_name));
++    if ($all_fields == array())
++      continue;
++    $entity = $all_fields['node'];
++    $code[] = "  \$domain_fields_variables['{$machine_name}'] = array(";
++    foreach ($entity as $bundle => $fields) {
++      $code[] = "    '{$bundle}' => array(";
++      $flat = FALSE;
++      foreach ($fields as $field_name => $options) {
++        if (array_search('1', $options)) {
++          $code[] = "      '{$field_name}' => " . features_var_export($options, '      ') . ",";
++          $flat = TRUE;
++        }
++      }
++      if (!$flat) {
++        //Delete bundles null
++        array_pop($code);
++      } else {
++        $code[] = "    ),";
++      }
++    }
++    $code[] = "  );";
++  }
++  $code[] = "\n  return \$domain_fields_variables;";
++  $output = implode("\n", $code);
++  return array('domain_fields_variables' => $output);
++}
++
++/**
++ * Implements hook_features_revert().
++ */
++function domain_fields_features_revert($module) {
++  return domain_fields_features_rebuild($module);
++}
++
++/**
++ * Implements hook_features_rebuild().
++ */
++function domain_fields_features_rebuild($module) {
++  if ($domain_fields_variables = domain_fields_features_load($module, 'domain_fields_variables', TRUE)) {
++    foreach ($domain_fields_variables as $machine_name => $feature_values) {
++      $settings = variable_domain_fields_get('domain_fields_' . $machine_name, array());
++      foreach ($feature_values as $bundle => $field_values) {
++        foreach ($field_values as $field_name => $values) {
++
++          if (isset($settings['node'][$bundle][$field_name])) {
++            $settings['node'][$bundle][$field_name] = array_merge($settings['node'][$bundle][$field_name], $values);
++          }
++        }
++      }
++      variable_domain_fields_set('domain_fields_' . $machine_name, $settings);
++    }
++  }
++}
++
++/**
++ * Features doesn't know how to load custom includes.
++ *
++ * @param $module
++ *  The name of the feature to load.
++ * @param $hook
++ *  The name of the domain hook.
++ * @param $return
++ *  Boolean indicator to return the results of the function.
++ *
++ * @return
++ *  The results of the $hook implemenation, if requested.
++ */
++function domain_fields_features_load($module, $hook, $return = TRUE) {
++  // Features does not handle module loading of custom files.
++  module_load_include('inc', $module, $module . '.fields_export');
++  $function = $module . '_' . $hook;
++  if ($return && function_exists($function)) {
++    return $function();
++  }
++}
+\ No newline at end of file
+diff --git a/domain_fields.install b/domain_fields.install
+index 02cd7ac..e9f8611 100644
+--- a/domain_fields.install
++++ b/domain_fields.install
+@@ -6,10 +6,18 @@
+  */
+ 
+ /**
++ * Implements hook_schema(),
++ */
++function cce_custom_operations_schema() {
++  $schema['domain_fields'] = _domain_field_table();
++  return $schema;
++}
++
++/**
+  * Implements hook_uninstall().
+  */
+ function domain_fields_uninstall() {
+-  db_delete('variable')
++  db_delete('domain_fields')
+     ->condition('name', db_like('domain_fields_') . '%', 'LIKE')
+     ->execute();
+ }
+@@ -37,3 +45,43 @@ function domain_fields_update_7003() {
+     variable_del('domain_fields_' . $domain['domain_id']);
+   }
+ }
++
++/**
++ * Change the use of the variables table by domain_fields table
++ */
++function domain_fields_update_7004() {
++  //Create new table like variables table
++  db_create_table('domain_fields', _domain_field_table());
++  $domains = domain_domains();
++  foreach ($domains as $domain) {
++    $old_settings =  variable_get('domain_fields_' . $domain['machine_name'], array());
++    $new_settings = variable_domain_fields_get('domain_fields_' . $domain['machine_name'], array());
++
++    if ($old_settings && empty($new_settings)) {
++      variable_domain_fields_set('domain_fields_' . $domain['machine_name'], $old_settings);
++    }
++
++    variable_del('domain_fields_' . $domain['machine_name']);
++  }
++}
++
++function _domain_field_table() {
++  return array(
++    'description' => 'Domain fields!',
++    'fields' => array(
++      'name' => array(
++        'type' => 'varchar',
++        'length' => 128,
++        'not null' => TRUE,
++        'default' => '',
++      ),
++      'value' => array(
++        'type' => 'blob',
++        'not null' => TRUE,
++        'size' => 'big',
++        'translatable' => TRUE,
++      ),
++    ),
++    'primary key' => array('name'),
++  );
++}
+\ No newline at end of file
+diff --git a/domain_fields.module b/domain_fields.module
+index a1b56a9..5557528 100644
+--- a/domain_fields.module
++++ b/domain_fields.module
+@@ -102,7 +102,7 @@ function domain_fields_settings($domain = NULL) {
+     $domain = domain_get_domain();
+   }
+ 
+-  return variable_get('domain_fields_' . $domain['machine_name'], array());
++  return variable_domain_fields_get('domain_fields_' . $domain['machine_name'], array());
+ }
+ 
+ /**
+@@ -178,4 +178,52 @@ function _domain_fields_pre_render($elements) {
+   }
+ 
+   return $elements;
++}
++
++/**
++ * function variable_domain_fields_set()
++ */
++function variable_domain_fields_set($name, $value) {
++  db_merge('domain_fields')->key(array('name' => $name))->fields(array('value' => serialize($value)))->execute();
++}
++
++/**
++ * function variable_domain_fields_get()
++ */
++function variable_domain_fields_get($name) {
++  $result = db_select('domain_fields', 'c')
++    ->fields('c', array('value'))
++    ->condition('name', $name)
++    ->execute()
++    ->fetchField();
++  if ($result)
++    return unserialize($result);
++  else
++    return FALSE;
++}
++
++/**
++ * function variable_domain_fields_del()
++ */
++function variable_domain_fields_del($name) {
++  db_delete('domain_fields')
++    ->condition('name', $name)
++    ->execute();
++}
++
++/**
++ * Implements hook_features_api().
++ */
++function domain_fields_features_api() {
++  $components = array(
++    'domain_fields' => array(
++      'name' => t('Domain fields variables'),
++      'default_hook' => 'domain_fields_default_variables',
++      'default_file' => FEATURES_DEFAULTS_CUSTOM,
++      'default_filename' => 'fields_export',
++      'feature_source' => TRUE,
++      'file' => drupal_get_path('module', 'domain_fields') .'/domain_fields.features.inc',
++    ),
++  );
++  return $components;
+ }
+\ No newline at end of file
