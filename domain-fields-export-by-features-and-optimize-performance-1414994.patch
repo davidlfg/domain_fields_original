@@ -1,3 +1,6 @@
+diff --git a/domain-fields-export-by-features-and-optimize-performance-1414994.patch b/domain-fields-export-by-features-and-optimize-performance-1414994.patch
+new file mode 100644
+index 0000000..e69de29
 diff --git a/domain_fields.admin.inc b/domain_fields.admin.inc
 index f481f8a..3f01a9c 100644
 --- a/domain_fields.admin.inc
@@ -28,10 +31,10 @@ index f481f8a..3f01a9c 100644
  /**
 diff --git a/domain_fields.features.inc b/domain_fields.features.inc
 new file mode 100644
-index 0000000..0236654
+index 0000000..a63c6ee
 --- /dev/null
 +++ b/domain_fields.features.inc
-@@ -0,0 +1,120 @@
+@@ -0,0 +1,133 @@
 +<?php
 +
 +/**
@@ -85,7 +88,7 @@ index 0000000..0236654
 +      $code[] = "    '{$bundle}' => array(";
 +      $flat = FALSE;
 +      foreach ($fields as $field_name => $options) {
-+        if (array_search('1', $options)) {
++        if (domain_fields_validity_update_fields($options)) {
 +          $code[] = "      '{$field_name}' => " . features_var_export($options, '      ') . ",";
 +          $flat = TRUE;
 +        }
@@ -104,6 +107,19 @@ index 0000000..0236654
 +  return array('domain_fields_variables' => $output);
 +}
 +
++/**
++ * Function domain_fields_validity_update_fields()
++ * @param $fields
++ * @return boolean
++ */
++function domain_fields_validity_update_fields($fields) {
++  foreach($fields as $value) {
++   if ($value == 1 || ($value != '' && is_string($value))) {
++      return TRUE;   
++   }
++  }
++  return FALSE;
++}
 +/**
 + * Implements hook_features_revert().
 + */
