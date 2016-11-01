@@ -51,7 +51,7 @@ function domain_fields_features_export_render($module_name, $data, $export = NUL
       $code[] = "    '{$bundle}' => array(";
       $flat = FALSE;
       foreach ($fields as $field_name => $options) {
-        if (array_search('1', $options)) {
+        if (domain_fields_validity_update_fields($options)) {
           $code[] = "      '{$field_name}' => " . features_var_export($options, '      ') . ",";
           $flat = TRUE;
         }
@@ -70,6 +70,19 @@ function domain_fields_features_export_render($module_name, $data, $export = NUL
   return array('domain_fields_variables' => $output);
 }
 
+/**
+ * Function domain_fields_validity_update_fields()
+ * @param $fields
+ * @return boolean
+ */
+function domain_fields_validity_update_fields($fields) {
+  foreach($fields as $value) {
+   if ($value == 1 || ($value != '' && is_string($value))) {
+      return TRUE;   
+   }
+  }
+  return FALSE;
+}
 /**
  * Implements hook_features_revert().
  */
