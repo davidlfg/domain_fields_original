@@ -6,10 +6,18 @@
  */
 
 /**
+ * Implements hook_schema(),
+ */
+function cce_custom_operations_schema() {
+  $schema['domain_fields'] = _domain_field_table();
+  return $schema;
+}
+
+/**
  * Implements hook_uninstall().
  */
 function domain_fields_uninstall() {
-  db_delete('variable')
+  db_delete('domain_fields')
     ->condition('name', db_like('domain_fields_') . '%', 'LIKE')
     ->execute();
 }
@@ -36,4 +44,44 @@ function domain_fields_update_7003() {
 
     variable_del('domain_fields_' . $domain['domain_id']);
   }
+}
+
+/**
+ * Change the use of the variables table by domain_fields table
+ */
+function domain_fields_update_7004() {
+  //Create new table like variables table
+  db_create_table('domain_fields', _domain_field_table());
+  $domains = domain_domains();
+  foreach ($domains as $domain) {
+    $old_settings =  variable_get('domain_fields_' . $domain['machine_name'], array());
+    $new_settings = variable_domain_fields_get('domain_fields_' . $domain['machine_name'], array());
+
+    if ($old_settings && empty($new_settings)) {
+      variable_domain_fields_set('domain_fields_' . $domain['machine_name'], $old_settings);
+    }
+
+    variable_del('domain_fields_' . $domain['machine_name']);
+  }
+}
+
+function _domain_field_table() {
+  return array(
+    'description' => 'Domain fields!',
+    'fields' => array(
+      'name' => array(
+        'type' => 'varchar',
+        'length' => 128,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'value' => array(
+        'type' => 'blob',
+        'not null' => TRUE,
+        'size' => 'big',
+        'translatable' => TRUE,
+      ),
+    ),
+    'primary key' => array('name'),
+  );
 }

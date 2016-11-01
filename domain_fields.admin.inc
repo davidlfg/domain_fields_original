@@ -95,9 +95,9 @@ function domain_fields_settings_form_reset_submit($form, &$form_state) {
   $machine_name = $form_state['domain']['machine_name'];
   $entity_type = $form_state['entity_type'];
 
-  $settings = variable_get('domain_fields_' . $machine_name, array());
+  $settings = variable_domain_fields_get('domain_fields_' . $machine_name, array());
   $settings[$entity_type] = array();
-  variable_set('domain_fields_' . $machine_name, $settings);
+  variable_domain_fields_set('domain_fields_' . $machine_name, $settings);
 }
 
 /**
@@ -107,9 +107,9 @@ function domain_fields_settings_form_save_submit($form, &$form_state) {
   $machine_name = $form_state['domain']['machine_name'];
   $entity_type = $form_state['entity_type'];
 
-  $settings = variable_get('domain_fields_' . $machine_name, array());
+  $settings = variable_domain_fields_get('domain_fields_' . $machine_name, array());
   $settings[$entity_type] = $form_state['values'][$entity_type];
-  variable_set('domain_fields_' . $machine_name, $settings);
+  variable_domain_fields_set('domain_fields_' . $machine_name, $settings);
 }
 
 /**

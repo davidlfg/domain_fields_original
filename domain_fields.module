@@ -102,7 +102,7 @@ function domain_fields_settings($domain = NULL) {
     $domain = domain_get_domain();
   }
 
-  return variable_get('domain_fields_' . $domain['machine_name'], array());
+  return variable_domain_fields_get('domain_fields_' . $domain['machine_name'], array());
 }
 
 /**
@@ -178,4 +178,52 @@ function _domain_fields_pre_render($elements) {
   }
 
   return $elements;
+}
+
+/**
+ * function variable_domain_fields_set()
+ */
+function variable_domain_fields_set($name, $value) {
+  db_merge('domain_fields')->key(array('name' => $name))->fields(array('value' => serialize($value)))->execute();
+}
+
+/**
+ * function variable_domain_fields_get()
+ */
+function variable_domain_fields_get($name) {
+  $result = db_select('domain_fields', 'c')
+    ->fields('c', array('value'))
+    ->condition('name', $name)
+    ->execute()
+    ->fetchField();
+  if ($result)
+    return unserialize($result);
+  else
+    return FALSE;
+}
+
+/**
+ * function variable_domain_fields_del()
+ */
+function variable_domain_fields_del($name) {
+  db_delete('domain_fields')
+    ->condition('name', $name)
+    ->execute();
+}
+
+/**
+ * Implements hook_features_api().
+ */
+function domain_fields_features_api() {
+  $components = array(
+    'domain_fields' => array(
+      'name' => t('Domain fields variables'),
+      'default_hook' => 'domain_fields_default_variables',
+      'default_file' => FEATURES_DEFAULTS_CUSTOM,
+      'default_filename' => 'fields_export',
+      'feature_source' => TRUE,
+      'file' => drupal_get_path('module', 'domain_fields') .'/domain_fields.features.inc',
+    ),
+  );
+  return $components;
 }
